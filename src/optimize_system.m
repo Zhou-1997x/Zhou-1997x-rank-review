@@ -48,9 +48,9 @@ function opt_results = optimize_system(TheSystem, cfg, varargin)
     % 使用默认评价函数向导
     wizard = TheMFE.SEQOptimizationWizard;
     if strcmpi(opts.Criterion, 'RMS')
-        wizard.Type = CYCLOPAPI.Editors.MFE.MeritCriterionType.RMSSpotRadiusCentroid;
+        wizard.Type = ZOSAPI.Editors.MFE.MeritCriterionType.RMSSpotRadiusCentroid;
     else
-        wizard.Type = CYCLOPAPI.Editors.MFE.MeritCriterionType.PTV_OPD;
+        wizard.Type = ZOSAPI.Editors.MFE.MeritCriterionType.PTV_OPD;
     end
     wizard.IsAssumeAxialSymmetry = true;
     wizard.Apply();
@@ -67,7 +67,7 @@ function opt_results = optimize_system(TheSystem, cfg, varargin)
         case 'DLS'
             optTool = TheSystem.Tools.OpenLocalOptimization();
             optTool.Algorithm = ...
-                CYCLOPAPI.Tools.Optimization.OptimizationAlgorithm.DampedLeastSquares;
+                ZOSAPI.Tools.Optimization.OptimizationAlgorithm.DampedLeastSquares;
             optTool.Cycles    = opts.Cycles;
             optTool.NumberOfCores = 0;   % 0 = 全部可用核心
 

@@ -21,7 +21,7 @@ function results = run_raytrace(TheSystem, cfg)
     TheTool = TheSystem.Tools.OpenBatchRayTrace();
     normUnpol = TheTool.CreateNormUnpol( ...
         cfg.num_rings * cfg.num_arms * 3 + 10, ...  % 最大光线数
-        CYCLOPAPI.Tools.RayTrace.RaysType.Real, ...
+        ZOSAPI.Tools.RayTrace.RaysType.Real, ...
         TheSystem.LDE.NumberOfSurfaces - 1);         % 追迹到像面
 
     %% ===== 添加光线 =====
@@ -39,7 +39,7 @@ function results = run_raytrace(TheSystem, cfg)
                 px = rho * cos(theta);
                 py = rho * sin(theta);
                 normUnpol.AddRay(0, hx, hy, px, py, ...
-                    CYCLOPAPI.Tools.RayTrace.OPDMode.None);
+                    ZOSAPI.Tools.RayTrace.OPDMode.None);
                 rayCount = rayCount + 1;
             end
         end

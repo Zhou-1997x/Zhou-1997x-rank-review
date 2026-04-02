@@ -92,7 +92,7 @@ function mtf = get_mtf(TheSystem, cfg)
     % 配置
     mtfSettings = mtfTool.GetSettings();
     mtfSettings.MaximumFrequency = 200;   % cycles/mm
-    mtfSettings.SampleSize = CYCLOPAPI.Analysis.SampleSizes.S_256x256;
+    mtfSettings.SampleSize = ZOSAPI.Analysis.SampleSizes.S_256x256;
     mtfTool.ApplyAndWaitForCompletion();
 
     mtfResults = mtfTool.GetResults();

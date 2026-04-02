@@ -40,7 +40,7 @@ function [TheApplication, TheSystem] = connect_zemax(cfg)
             if ~IsInit
                 % 回退：尝试创建新的 Standalone Application
                 TheApplication = ZOSAPI.ZOSAPI_Connection();
-                modeFlag = CYCLOPAPI.SessionMode.Standalone;
+                modeFlag = ZOSAPI.SessionMode.Standalone;
                 TheApplication.CreateNewApplication(modeFlag);
             end
 

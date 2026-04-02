@@ -75,12 +75,12 @@ function TheSystem = build_singlet_lens(TheSystem, cfg)
     %% ===== 设置像面求解 (Marginal Ray Height Solve) =====
     % 让 Zemax 自动调整后截距使边缘光线汇聚到像面
     solveData = Surf3.ThicknessCell.CreateSolveType( ...
-        CYCLOPAPI.Editors.LDE.SolveType.MarginalRayHeight);
+        ZOSAPI.Editors.LDE.SolveType.MarginalRayHeight);
     Surf3.ThicknessCell.SetSolveData(solveData);
 
     %% ===== 更新系统 =====
     TheSystem.SystemData.RayAiming.Type = ...
-        CYCLOPAPI.SystemData.RayAimingType.Real;
+        ZOSAPI.SystemData.RayAimingType.Real;
 
     if cfg.verbose
         fprintf('[build_singlet_lens] 单透镜构建完成。共 %d 个表面。\n', ...
