@@ -27,6 +27,7 @@ end
 %% 检查核心源文件
 required_files = {
     'main_demo.m'
+    'startup.m'
     'config/zemax_config.m'
     'src/connect_zemax.m'
     'src/build_singlet_lens.m'
@@ -34,8 +35,10 @@ required_files = {
     'src/analyze_system.m'
     'src/optimize_system.m'
     'src/utils/plot_results.m'
+    'src/utils/plot_layout.m'
     'src/utils/save_results.m'
     'src/utils/disconnect_zemax.m'
+    'src/utils/validate_config.m'
 };
 
 for i = 1:length(required_files)
@@ -50,6 +53,7 @@ example_files = {
     'examples/example_quick_start.m'
     'examples/example_custom_lens.m'
     'examples/example_parameter_sweep.m'
+    'examples/example_interactive_session.m'
 };
 
 for i = 1:length(example_files)
