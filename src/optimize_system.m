@@ -9,10 +9,11 @@ function opt_results = optimize_system(TheSystem, cfg, varargin)
 %       cfg       - 配置结构体
 %
 %   可选参数（Name-Value 对）：
-%       'Method'       : 'DLS' (默认) 或 'HAMMER'
-%       'Cycles'       : 优化循环数 (默认: 50)
-%       'Criterion'    : 'RMS' (默认) 或 'PTV'
-%       'Variables'     : 自定义变量设置函数句柄 (默认: 自动设置曲率变量)
+%       'Method'        : 'DLS' (默认) 或 'HAMMER'
+%       'Cycles'        : 优化循环数 (默认: 50)
+%       'Criterion'     : 'RMS' (默认) 或 'PTV'
+%       'Variables'     : 自定义变量设置函数句柄 (默认: 自动设置)
+%       'OptThickness'  : 是否将透镜厚度也设为变量 (默认: false)
 %
 %   输出：
 %       opt_results - 结构体：
@@ -20,13 +21,23 @@ function opt_results = optimize_system(TheSystem, cfg, varargin)
 %           .merit_final    : 优化后评价函数值
 %           .improvement    : 改善百分比
 %           .n_cycles       : 实际运行循环数
+%           .method         : 使用的优化方法
+%
+%   示例：
+%       % 基本用法
+%       opt = optimize_system(sys, cfg);
+%
+%       % 使用 Hammer 全局优化 + 厚度变量
+%       opt = optimize_system(sys, cfg, ...
+%           'Method', 'HAMMER', 'Cycles', 20, 'OptThickness', true);
 
     %% ===== 解析参数 =====
     p = inputParser;
-    addParameter(p, 'Method',    'DLS',  @ischar);
-    addParameter(p, 'Cycles',    50,     @isnumeric);
-    addParameter(p, 'Criterion', 'RMS',  @ischar);
-    addParameter(p, 'Variables', [],     @(x) isempty(x) || isa(x, 'function_handle'));
+    addParameter(p, 'Method',       'DLS',  @ischar);
+    addParameter(p, 'Cycles',       50,     @isnumeric);
+    addParameter(p, 'Criterion',    'RMS',  @ischar);
+    addParameter(p, 'Variables',    [],     @(x) isempty(x) || isa(x, 'function_handle'));
+    addParameter(p, 'OptThickness', false,  @(x) islogical(x) || isnumeric(x));
     parse(p, varargin{:});
     opts = p.Results;
 
@@ -37,7 +48,7 @@ function opt_results = optimize_system(TheSystem, cfg, varargin)
 
     %% ===== 设置变量 =====
     if isempty(opts.Variables)
-        set_default_variables(TheSystem, cfg);
+        set_default_variables(TheSystem, cfg, opts.OptThickness);
     else
         opts.Variables(TheSystem, cfg);
     end
@@ -83,7 +94,7 @@ function opt_results = optimize_system(TheSystem, cfg, varargin)
     end
 
     if cfg.verbose
-        fprintf('  正在运行 %s 优化...\n', opts.Method);
+        fprintf('  正在运行 %s 优化 (%d 循环)...\n', opts.Method, opts.Cycles);
     end
 
     optTool.RunAndWaitForCompletion();
@@ -91,7 +102,11 @@ function opt_results = optimize_system(TheSystem, cfg, varargin)
 
     %% ===== 记录最终 Merit =====
     merit_final = TheMFE.CalculateMeritFunction();
-    improvement = (merit_initial - merit_final) / merit_initial * 100;
+    if merit_initial ~= 0
+        improvement = (merit_initial - merit_final) / merit_initial * 100;
+    else
+        improvement = 0;
+    end
 
     %% ===== 打包结果 =====
     opt_results.merit_initial = merit_initial;
@@ -99,11 +114,12 @@ function opt_results = optimize_system(TheSystem, cfg, varargin)
     opt_results.improvement   = improvement;
     opt_results.n_cycles      = opts.Cycles;
     opt_results.method        = opts.Method;
+    opt_results.criterion     = opts.Criterion;
 
     if cfg.verbose
         fprintf('  最终评价函数值: %.6f (改善 %.2f%%)\n', ...
             merit_final, improvement);
-        fprintf('[optimize_system] 优化完成。\n');
+        fprintf('[optimize_system] ✓ 优化完成。\n');
     end
 
 end
@@ -111,35 +127,53 @@ end
 
 %% ==================== 子函数 ====================
 
-function set_default_variables(TheSystem, cfg)
+function set_default_variables(TheSystem, cfg, optThickness)
 % SET_DEFAULT_VARIABLES  设置默认优化变量
 %   将透镜前后表面曲率半径设为变量
+%   如果 optThickness 为 true，同时将厚度设为变量
 
     TheLDE = TheSystem.LDE;
     nSurf  = TheLDE.NumberOfSurfaces;
+    varCount = 0;
 
     for sIdx = 1:(nSurf - 1)
         surf = TheLDE.GetSurfaceAt(sIdx);
         material = char(surf.Material);
 
-        % 对有玻璃材料的面及其前一面设置曲率变量
-        if ~isempty(material)
-            % 当前面（前表面）设置曲率变量
+        % 对有玻璃材料的面设置曲率和厚度变量
+        if ~isempty(material) && ~strcmp(material, '')
+            % 当前面（前表面）曲率设为变量
             surf.RadiusCell.MakeSolveVariable();
+            varCount = varCount + 1;
             if cfg.verbose
-                fprintf('  Surface %d (%s): Radius -> Variable\n', ...
+                fprintf('  Surface %d (%s): Radius → Variable\n', ...
                     sIdx, char(surf.Comment));
             end
 
-            % 如果存在下一个面（后表面），也设为变量
+            % 厚度变量（可选）
+            if optThickness
+                surf.ThicknessCell.MakeSolveVariable();
+                varCount = varCount + 1;
+                if cfg.verbose
+                    fprintf('  Surface %d (%s): Thickness → Variable\n', ...
+                        sIdx, char(surf.Comment));
+                end
+            end
+
+            % 下一个面（后表面）曲率也设为变量
             if sIdx + 1 < nSurf
                 nextSurf = TheLDE.GetSurfaceAt(sIdx + 1);
                 nextSurf.RadiusCell.MakeSolveVariable();
+                varCount = varCount + 1;
                 if cfg.verbose
-                    fprintf('  Surface %d (%s): Radius -> Variable\n', ...
+                    fprintf('  Surface %d (%s): Radius → Variable\n', ...
                         sIdx + 1, char(nextSurf.Comment));
                 end
             end
         end
+    end
+
+    if cfg.verbose
+        fprintf('  共设置 %d 个优化变量。\n', varCount);
     end
 end

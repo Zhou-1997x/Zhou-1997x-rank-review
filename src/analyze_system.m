@@ -1,5 +1,5 @@
 function analysis = analyze_system(TheSystem, cfg)
-% ANALYZE_SYSTEM  对光学系统进行综合分析（点列图、MTF、波前）
+% ANALYZE_SYSTEM  对光学系统进行综合分析（点列图、MTF、波前、Seidel 像差）
 %
 %   analysis = analyze_system(TheSystem, cfg)
 %
@@ -9,10 +9,16 @@ function analysis = analyze_system(TheSystem, cfg)
 %
 %   输出：
 %       analysis  - 结构体，包含：
+%           .efl        : 系统有效焦距 (mm)
 %           .spot       : 点列图数据结构体
 %           .mtf        : MTF 数据结构体
 %           .wavefront  : 波前误差 (PV & RMS)
-%           .efl        : 系统有效焦距 (mm)
+%           .seidel     : Seidel 像差系数 (5 项三级像差)
+%
+%   示例：
+%       analysis = analyze_system(sys, cfg);
+%       fprintf('EFL = %.2f mm\n', analysis.efl);
+%       fprintf('轴上 RMS = %.2f µm\n', analysis.spot.rms_radius(1)*1000);
 
     if cfg.verbose
         fprintf('[analyze_system] 正在执行系统分析...\n');
@@ -34,8 +40,11 @@ function analysis = analyze_system(TheSystem, cfg)
     %% ===== 4. 波前误差 =====
     analysis.wavefront = get_wavefront(TheSystem, cfg);
 
+    %% ===== 5. Seidel 像差系数 =====
+    analysis.seidel = get_seidel(TheSystem, cfg);
+
     if cfg.verbose
-        fprintf('[analyze_system] 分析完成。\n');
+        fprintf('[analyze_system] ✓ 分析完成。\n');
     end
 
 end
@@ -147,5 +156,57 @@ function wf = get_wavefront(TheSystem, cfg)
 
     if cfg.verbose
         fprintf('  波前误差: PV = %.4f waves, RMS = %.4f waves\n', wf.pv, wf.rms);
+    end
+end
+
+
+function seidel = get_seidel(TheSystem, cfg)
+% GET_SEIDEL  提取 Seidel（三级）像差系数
+%
+%   五项 Seidel 像差:
+%     S1 - 球差 (Spherical Aberration)
+%     S2 - 彗差 (Coma)
+%     S3 - 像散 (Astigmatism)
+%     S4 - 场曲 (Field Curvature / Petzval)
+%     S5 - 畸变 (Distortion)
+
+    seidel = struct('S1', 0, 'S2', 0, 'S3', 0, 'S4', 0, 'S5', 0, ...
+                    'names', {{'球差(S1)','彗差(S2)','像散(S3)','场曲(S4)','畸变(S5)'}});
+
+    try
+        seidelTool = TheSystem.Analyses.New_SeidelCoefficients();
+        seidelTool.ApplyAndWaitForCompletion();
+
+        seidelResults = seidelTool.GetResults();
+        dataGrid = seidelResults.DataGrids;
+
+        if dataGrid.Length > 0
+            grid = dataGrid.Item(0);
+            nRows = grid.NumberOfRows;
+            nCols = grid.NumberOfColumns;
+
+            % Seidel 系数表通常：每行是一个表面，列包含 S1~S5 和总和
+            % 最后一行是总和 (Sum)
+            if nRows > 0 && nCols >= 6
+                sumRow = nRows - 1;   % 0-indexed 最后一行
+                seidel.S1 = grid.Cell(sumRow, 1).DoubleValue;  % 球差
+                seidel.S2 = grid.Cell(sumRow, 2).DoubleValue;  % 彗差
+                seidel.S3 = grid.Cell(sumRow, 3).DoubleValue;  % 像散
+                seidel.S4 = grid.Cell(sumRow, 4).DoubleValue;  % 场曲
+                seidel.S5 = grid.Cell(sumRow, 5).DoubleValue;  % 畸变
+            end
+        end
+
+        seidelTool.Close();
+
+    catch ME
+        if cfg.verbose
+            fprintf('  [注意] Seidel 像差提取失败: %s\n', ME.message);
+        end
+    end
+
+    if cfg.verbose
+        fprintf('  Seidel 像差: S1=%.4f, S2=%.4f, S3=%.4f, S4=%.4f, S5=%.4f\n', ...
+            seidel.S1, seidel.S2, seidel.S3, seidel.S4, seidel.S5);
     end
 end
